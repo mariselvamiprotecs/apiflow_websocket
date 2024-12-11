@@ -1251,6 +1251,7 @@ function prepareEdges(edgesMap) {
   return { edgesArray, deleteEdgeId };
 }
 
+
 // function prepareKeys(globalKeysMap, globalKeys) {
 //   if (globalKeysMap) {
 //     const globalKeysJson = globalKeysMap.toJSON() || {};
