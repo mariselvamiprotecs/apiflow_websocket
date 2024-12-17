@@ -25,6 +25,7 @@ function validateSecretKey(inputKey) {
   }
 }
 
+
 // Function to handle WebSocket connection after secretKey validation
 function handleConnection(ws, request) {
   // Retrieve the secretKey from the headers
