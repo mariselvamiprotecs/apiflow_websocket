@@ -1,61 +1,150 @@
-// backend.js
-// const WebSocket = require('ws');
-// const Y = require('yjs');
-// require('y-websocket');
 
-// Create a WebSocket server
-// const wss = new WebSocket.Server({ port: 8080 });
-// const WebSocket = require('ws');
+const crypto = require("crypto");
 
-// // Define the port on which the WebSocket server will listen
-// const PORT = 8080;
+// Configuration
+const validSecretKey = "Xq47xpqfMCuW2aEsaF8LlC$si6#ErjDs"; // The correct/valid secretKey
+const encryptKey = "gz34gxjLZMhnZqN4hkpT2bSK4sXe5LEY"; // AES key for encryption/decryption
 
-// // Create a WebSocket server instance
-// const wss = new WebSocket.Server({ port: PORT });
+// SecretKey for testing
+let secretKey = "Xq47xpqfMCuW2aEsaF8LlC$si6#ErjDs"; // Test with a valid key first
 
-// // Map to store connected clients by room
-// const roomClients = new Map();
+// Function to validate the secretKey
+function validateSecretKey(inputKey) {
+  if (!inputKey) {
+    console.error(" SecretKey is empty");
+    return false;
+  } else if (inputKey === validSecretKey) {
+    console.log(" SecretKey is valid");
+    return true;
+  } else {
+    console.error(" SecretKey is invalid");
+    return false;
+  }
+}
 
-// // Event listener for WebSocket connections
-// wss.on('connection', function connection(ws, req) {
-//   // Extract room from query parameters or use a default room
-//   const urlParams = new URLSearchParams(req.url.slice(1));
-//   const room = urlParams.get('room') || 'default';
+// Function to encrypt data using AES-256-CBC
+function encryptData(data) {
+  try {
+    const iv = crypto.randomBytes(16); // Generate a random 16-byte IV
+    const cipher = crypto.createCipheriv(
+      "aes-256-cbc",
+      Buffer.from(encryptKey, "ascii"),
+      iv
+    );
 
-//   // Add client to room
-//   if (!roomClients.has(room)) {
-//     roomClients.set(room, new Set());
-//   }
-//   roomClients.get(room).add(ws);
+    let encrypted = cipher.update(data, "utf8", "hex");
+    encrypted += cipher.final("hex");
 
-//   console.log(`Client connected to room ${room}`);
+    const encryptedData = iv.toString("hex") + encrypted; // Combine IV and encrypted data
+    console.log("🔐 Encrypted Data:", encryptedData);
+    return encryptedData;
+  } catch (err) {
+    console.error(" Encryption Error:", err.message);
+    return null;
+  }
+}
 
-//   // Event listener for messages from clients
-//   ws.on('message', function incoming(message) {
-//     console.log(`Received message from client in room ${room}: ${message}`);
+// Function to decrypt data using AES-256-CBC
+function decryptData(encryptedData) {
+  try {
+    const iv = Buffer.from(encryptedData.substring(0, 32), "hex"); // Extract IV
+    const encrypted = encryptedData.substring(32); // Extract encrypted data
 
-//     // Broadcast the message to all clients in the same room
-//     roomClients.get(room).forEach(function each(client) {
-//       // if (client !== ws && client.readyState === WebSocket.OPEN) {
-//         client.send(message, { binary: false })
-//       // }
-//     });
-//   });
+    const decipher = crypto.createDecipheriv(
+      "aes-256-cbc",
+      Buffer.from(encryptKey, "ascii"),
+      iv
+    );
 
-//   // Event listener for WebSocket disconnections
-//   ws.on('close', function close() {
-//     // Remove client from room
-//     if (roomClients.has(room)) {
-//       roomClients.get(room).delete(ws);
-//     }
-//     console.log(`Client disconnected from room ${room}`);
-//   });
-// });
+    let decrypted = decipher.update(encrypted, "hex", "utf8");
+    decrypted += decipher.final("utf8");
 
-// // Log server start
-// console.log(`WebSocket server is listening on port ${PORT}`);
+    console.log(" Decrypted Data:", decrypted);
+    return decrypted;
+  } catch (err) {
+    console.error(" Decryption Error:", err.message);
+    return null;
+  }
+}
 
-// #!/usr/bin/env node
+// Function to verify data integrity using HMAC
+function verifyDataIntegrity(data) {
+  try {
+    const hmac = crypto.createHmac("sha256", secretKey);
+    hmac.update(data);
+    const hash = hmac.digest("hex");
+    console.log("🔍 HMAC Hash:", hash);
+    return hash;
+  } catch (err) {
+    console.error(" HMAC Error:", err.message);
+    return null;
+  }
+}
+
+// Function to decode JWT token
+function decodeJWT(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) throw new Error("Invalid JWT token");
+
+    const payload = parts[1]; // Payload part
+    const decodedPayload = Buffer.from(payload, "base64url").toString("utf8");
+    const claims = JSON.parse(decodedPayload);
+
+    console.log(" Decoded JWT Claims:", claims);
+    return claims;
+  } catch (err) {
+    console.error(" JWT Decode Error:", err.message);
+    return null;
+  }
+}
+
+// Example JWT Token
+const token =
+  "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwidHlwIjoiSldUIiwiY3R5IjoiSldUIn0.m0Wy83v-526qJ4anVfahZ914txXLiY8ZT-orfNC08JdFJSBKj-lCbA.PpS5t0-ti5UYbnNaPmkTcg.TXxukhJwvezfcPD2B9dTl4FxBgr_UhGB9qbsBjIK-89o-REPcfBwNr8WRpyyE4DAsei4fFG3ZzuEmFChW6Lh8JuRRm_btAs7LVVjllWwkVxr3Pqn3fZc4_FIeN9i36c-1ZJUvR4tSyifb46P--g8nPdAtWNzTGxd--KidrTB-EfH_w1MgFXNDoaNrNy8e3Gcty_rGCxtfUcVclDAz_j6I2jZ0V0O8Fv9lf3YIKnMo4g2_55wGq71fYnYCFFmcEVKwYl1o66fTdfXK3mzKbHrPQ-kci3J_fdN1ZExaDSYqJffvyWFumCnZFGsvfkdKOwmleFmnoZjjBlkD0p4EhVuwViydxC1gQcIhbMQZJ0nFZUjG-rtGoQmPZ-Ds9yycDZT5eg_hzZAF2jLCbvAIh5SC58N6NNeFFeDivWhuO63VqkIIM1XXstaXIWt4v0xiwUzDRu-p-yekhcXAImOtNieTAOLlVwt8QdgoVZqtUEfDBzxUpq9ZSAeMeDDHXP7A17PhLJTKExvmGqaW1TOJJqICoJLSNF6FvuhdNlg-2uujNFgJSA_jgejlvKAKnCFOUQasczia3c2upXoRTRyCPYbo26OFsm50ZVbAyfoL2pfTCO-PMbMHG2v97eG7R8WMQr9eyXgZ3tsNoauOMLkY1iURuu1BaKHzUxXyThmWuhvwaO3TDZ_WGc2UkI8ZsGeRmYg_RU-PStVwqpOGr45Q8027Jb47Jxpmq8E0QMOXOGKT6_0gNN7u6G6INGQQuq5z5b1sji_vTx0g6FlCIVHw2oH0x4Zcbn-_gyZzere_ZjXZL8.Vxg3yMdyUgn1oPtkWozJ0A";
+
+// Main Logic Execution
+console.log("\n🔑 ** SecretKey Validation **");
+if (validateSecretKey(secretKey)) {
+  console.log("\n✅ Proceeding with operations...");
+
+  // Encrypt the token
+
+  const encryptedToken = encryptData(token);
+
+  // Decrypt the token
+  if (encryptedToken) {
+    const decryptedToken = decryptData(encryptedToken);
+
+    // Verify the data integrity
+    if (decryptedToken) {
+      verifyDataIntegrity(decryptedToken);
+    }
+
+    // Decode JWT claims
+    decodeJWT(token);
+  }
+} else {
+  console.log("🚫 Operations aborted due to invalid secretKey.");
+}
+
+// Test: Empty secretKey
+// console.log("\n🛑 ** Test with Empty SecretKey **");
+// secretKey = "";
+// validateSecretKey(secretKey);
+
+// // Test: Invalid secretKey
+// console.log("\n🛑 ** Test with Invalid SecretKey **");
+// secretKey = "InvalidSecretKey123";
+// validateSecretKey(secretKey);
+
+// Test: Valid secretKey
+console.log("\n ** Test with Valid SecretKey **");
+secretKey = validSecretKey;
+validateSecretKey(secretKey);
+
+
+
 
 /**
  * @type {any}
